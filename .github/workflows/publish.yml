@@ -50,5 +50,12 @@ jobs:
       - name: Publish to npm
         run: npm publish --provenance --access public
 
+      - name: Upload npm logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-debug-logs
+          path: /home/runner/.npm/_logs/
+
       - name: Push version commit
         run: git push --follow-tags
