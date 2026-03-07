@@ -7,7 +7,7 @@
   "module": "index.js",
   "repository": {
     "type": "git",
-    "url": "https://github.com/ashomurodov/dev-inspector.git"
+    "url": "git+https://github.com/ashomurodov/dev-inspector.git"
   },
   "homepage": "https://github.com/ashomurodov/dev-inspector#readme",
   "bugs": {
