@@ -227,7 +227,7 @@ export function init(options = {}) {
     hideHoverOverlay()
     hideSpacing(spacingContainer)
 
-    // Stop inspect mode without hiding the selected-element overlay
+     // Stop inspect mode without hiding the selected-element overlay
     inspecting = false
     cog.classList.remove('active')
     document.body.classList.remove('di-inspect-mode')
