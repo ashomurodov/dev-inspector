@@ -48,7 +48,7 @@ jobs:
           npm version $BUMP -m "chore: release v%s [skip ci]"
 
       - name: Publish to npm
-        run: npm publish
+        run: npm publish --provenance --access public
 
       - name: Push version commit
         run: git push --follow-tags
