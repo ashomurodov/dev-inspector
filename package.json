@@ -7,11 +7,11 @@
   "module": "index.js",
   "repository": {
     "type": "git",
-    "url": "https://github.com/ashomurodov/aetherx-ui-inspector.git"
+    "url": "https://github.com/ashomurodov/dev-inspector.git"
   },
-  "homepage": "https://github.com/ashomurodov/aetherx-ui-inspector#readme",
+  "homepage": "https://github.com/ashomurodov/dev-inspector#readme",
   "bugs": {
-    "url": "https://github.com/ashomurodov/aetherx-ui-inspector/issues"
+    "url": "https://github.com/ashomurodov/dev-inspector/issues"
   },
   "exports": {
     ".": "./index.js",
