@@ -1,6 +1,6 @@
 {
   "name": "aetherx-ui-inspector",
-  "version": "1.4.2",
+  "version": "1.4.3",
   "description": "Universal dev-only UI inspector with live editing and feedback clipboard",
   "type": "module",
   "main": "index.js",
