@@ -27,6 +27,9 @@ const isDev = import.meta.env.DEV
   <!-- Nuxt: wrap in <ClientOnly> -->
   <ClientOnly>
     <DevInspector v-if="isDev" />
+
+    <!-- if "Open in VS Code" shows a wrong/broken path, pass rootPath: -->
+    <!-- <DevInspector v-if="isDev" root-path="D:/Work/my-project" /> -->
   </ClientOnly>
 </template>
 ```
@@ -42,6 +45,8 @@ export default function Layout({ children }) {
     <>
       {children}
       {process.env.NODE_ENV === 'development' && <DevInspector />}
+      {/* if "Open in VS Code" shows a wrong/broken path, pass rootPath: */}
+      {/* process.env.NODE_ENV === 'development' && <DevInspector rootPath="D:/Work/my-project" /> */}
     </>
   )
 }
@@ -107,9 +112,9 @@ init()
 
 ## Open in VS Code — `rootPath` option
 
-The VS Code button builds a `vscode://file/` URL from the component's `__file` path. In most Vite setups `__file` is already absolute, so it works without any configuration.
+The VS Code button builds a `vscode://file/` URL from the component's `__file` path. In most Vite setups `__file` is already absolute, so **it works without any configuration**.
 
-If your `__file` values are relative (e.g. `layouts/landing.vue` instead of `/D:/Work/project/layouts/landing.vue`), pass your project's absolute root path:
+If the button opens VS Code but the path is wrong or broken, your `__file` values are relative (e.g. `layouts/landing.vue` instead of `/D:/Work/project/layouts/landing.vue`). Fix this by passing your project's absolute root path:
 
 **Vue**
 ```vue
@@ -127,18 +132,20 @@ import { init } from 'aetherx-ui-inspector'
 init({ rootPath: 'D:/Work/my-project' })
 ```
 
-Using an env variable keeps it clean:
+Using an env variable keeps it portable across machines:
 
 ```vue
 <DevInspector v-if="isDev" :root-path="import.meta.env.VITE_PROJECT_ROOT" />
 ```
 
 ```env
-# .env.local
+# .env.local  ← never commit this file
 VITE_PROJECT_ROOT=D:/Work/my-project
 ```
 
-> **Note:** The `rootPath` option was added in v1.3.11. Earlier versions without it are unaffected — the option is optional and defaults to `''`.
+> **TypeScript / IDE autocomplete** — full type definitions are included (`rootPath` is typed as `string?` on all wrappers and on `init()`).
+>
+> **Note:** The `rootPath` option was added in v1.3.11. It is optional and defaults to `''` — existing code requires no changes.
 
 ---
 

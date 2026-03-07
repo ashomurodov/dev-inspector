@@ -5,6 +5,7 @@
   "type": "module",
   "main": "index.js",
   "module": "index.js",
+  "types": "./index.d.ts",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ashomurodov/dev-inspector.git"
@@ -14,16 +15,29 @@
     "url": "https://github.com/ashomurodov/dev-inspector/issues"
   },
   "exports": {
-    ".": "./index.js",
-    "./react": "./react/index.jsx",
-    "./vue": "./vue/index.vue",
-    "./auto": "./index.js"
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./index.js"
+    },
+    "./react": {
+      "types": "./react/index.d.ts",
+      "default": "./react/index.jsx"
+    },
+    "./vue": {
+      "types": "./vue/index.d.ts",
+      "default": "./vue/index.vue"
+    },
+    "./auto": {
+      "types": "./index.d.ts",
+      "default": "./index.js"
+    }
   },
   "files": [
     "src",
     "react",
     "vue",
-    "index.js"
+    "index.js",
+    "index.d.ts"
   ],
   "keywords": [
     "dev",
