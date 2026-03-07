@@ -29,7 +29,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           registry-url: 'https://registry.npmjs.org'
 
       - name: Configure git
@@ -48,9 +48,7 @@ jobs:
           npm version $BUMP -m "chore: release v%s [skip ci]"
 
       - name: Publish to npm
-        run: |
-          sed -i '/_authToken/d' "$NPM_CONFIG_USERCONFIG"
-          npm publish --provenance --access public
+        run: npm publish --provenance --access public
 
       - name: Push version commit
         run: git push --follow-tags
