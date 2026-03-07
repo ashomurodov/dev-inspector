@@ -9,6 +9,7 @@ on:
       - 'react/**'
       - 'index.js'
       - 'package.json'
+      - 'rollup.config.js'
 
 permissions:
   id-token: write  # Required for OIDC trusted publisher
