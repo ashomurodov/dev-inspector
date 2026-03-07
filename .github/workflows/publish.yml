@@ -10,6 +10,7 @@ on:
       - 'index.js'
       - 'package.json'
       - 'rollup.config.js'
+      - '.github/workflows/publish.yml'
 
 permissions:
   id-token: write  # Required for OIDC trusted publisher
