@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "WebFetch(domain:docs.npmjs.com)"
+      "WebFetch(domain:docs.npmjs.com)",
+      "Bash(xargs wc -c)",
+      "Bash(cmd.exe /c \"for %f in \\(D:\\\\Work\\\\dev-inspector\\\\src\\\\*.js D:\\\\Work\\\\dev-inspector\\\\vue\\\\*.vue D:\\\\Work\\\\dev-inspector\\\\vue\\\\*.jsx D:\\\\Work\\\\dev-inspector\\\\react\\\\*.jsx D:\\\\Work\\\\dev-inspector\\\\index.js\\) do @echo %~zf %f\")",
+      "Bash(powershell.exe -Command \"Get-ChildItem -Path ''D:\\\\Work\\\\dev-inspector'' -Recurse -Include ''*.js'',''*.jsx'',''*.vue'' | Where-Object { $_.FullName -notmatch ''\\\\.git'' } | Select-Object Name, @{N=''KB'';E={[math]::Round\\($_.Length/1KB,1\\)}} | Sort-Object KB -Descending | Format-Table -AutoSize\")"
     ]
   }
 }

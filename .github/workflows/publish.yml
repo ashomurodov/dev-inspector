@@ -47,6 +47,12 @@ jobs:
           fi
           npm version $BUMP -m "chore: release v%s [skip ci]"
 
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build
+        run: npm run build
+
       - name: Publish to npm
         run: npm publish --provenance --access public
 

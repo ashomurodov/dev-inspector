@@ -3,8 +3,8 @@
   "version": "1.4.7",
   "description": "Universal dev-only UI inspector with live editing and feedback clipboard",
   "type": "module",
-  "main": "index.js",
-  "module": "index.js",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
   "types": "./index.d.ts",
   "repository": {
     "type": "git",
@@ -17,28 +17,30 @@
   "exports": {
     ".": {
       "types": "./index.d.ts",
-      "default": "./index.js"
+      "default": "./dist/index.js"
     },
     "./react": {
       "types": "./react/index.d.ts",
-      "default": "./react/index.jsx"
+      "default": "./dist/react.js"
     },
     "./vue": {
       "types": "./vue/index.d.ts",
-      "default": "./vue/index.vue"
+      "default": "./dist/vue.js"
     },
     "./auto": {
       "types": "./index.d.ts",
-      "default": "./index.js"
+      "default": "./dist/index.js"
     }
   },
   "files": [
-    "src",
-    "react",
-    "vue",
-    "index.js",
-    "index.d.ts"
+    "dist",
+    "index.d.ts",
+    "vue/index.d.ts",
+    "react/index.d.ts"
   ],
+  "scripts": {
+    "build": "rollup -c"
+  },
   "keywords": [
     "dev",
     "inspector",
@@ -49,6 +51,10 @@
     "css"
   ],
   "license": "MIT",
+  "devDependencies": {
+    "@rollup/plugin-terser": "^0.4.4",
+    "rollup": "^4.0.0"
+  },
   "peerDependencies": {
     "react": ">=17.0.0",
     "vue": ">=3.0.0"
