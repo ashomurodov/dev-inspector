@@ -1,0 +1,46 @@
+{
+  "name": "aetherx-ui-inspector",
+  "version": "1.3.11",
+  "description": "Universal dev-only UI inspector with live editing and feedback clipboard",
+  "type": "module",
+  "main": "index.js",
+  "module": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/YOUR_USERNAME/aetherx-ui-inspector.git"
+  },
+  "homepage": "https://github.com/YOUR_USERNAME/aetherx-ui-inspector#readme",
+  "bugs": {
+    "url": "https://github.com/YOUR_USERNAME/aetherx-ui-inspector/issues"
+  },
+  "exports": {
+    ".": "./index.js",
+    "./react": "./react/index.jsx",
+    "./vue": "./vue/index.vue",
+    "./auto": "./index.js"
+  },
+  "files": [
+    "src",
+    "react",
+    "vue",
+    "index.js"
+  ],
+  "keywords": [
+    "dev",
+    "inspector",
+    "ui",
+    "debug",
+    "design",
+    "feedback",
+    "css"
+  ],
+  "license": "MIT",
+  "peerDependencies": {
+    "react": ">=17.0.0",
+    "vue": ">=3.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": { "optional": true },
+    "vue": { "optional": true }
+  }
+}
