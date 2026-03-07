@@ -18,7 +18,8 @@ jobs:
     if: "!contains(github.event.head_commit.message, '[skip ci]')"
 
     permissions:
-      contents: write  # needed to push the version bump commit + tag
+      contents: write   # push version bump commit + tag
+      id-token: write   # OIDC — allows npm to verify this is GitHub Actions
 
     steps:
       - uses: actions/checkout@v4
@@ -36,11 +37,11 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      # Bumps package.json patch version (1.3.11 → 1.3.12),
-      # commits "chore: release v1.3.12 [skip ci]", and creates a git tag.
-      # Use "minor" or "major" in the commit message to control bump size:
-      #   git commit -m "feat: something [minor]"  → bumps minor
-      #   git commit -m "feat: something [major]"  → bumps major
+      # Bumps package.json patch version (e.g. 1.3.13 → 1.3.14),
+      # commits "chore: release v1.3.14 [skip ci]", and creates a git tag.
+      # Control bump size via commit message:
+      #   [minor] → bumps minor  (1.3.13 → 1.4.0)
+      #   [major] → bumps major  (1.3.13 → 2.0.0)
       - name: Bump version
         run: |
           MSG="${{ github.event.head_commit.message }}"
@@ -56,7 +57,7 @@ jobs:
       - name: Push version commit and tag
         run: git push --follow-tags
 
+      # --provenance attaches a signed build attestation (best practice with OIDC)
+      # --access public required for scoped packages, safe to keep for unscoped too
       - name: Publish to npm
-        run: npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --provenance --access public
