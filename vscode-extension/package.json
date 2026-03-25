@@ -1,0 +1,47 @@
+{
+  "name": "dev-inspector-bridge",
+  "displayName": "Dev Inspector Bridge",
+  "description": "Companion extension for aetherx-ui-inspector — bridges browser inspector to Claude Code in VS Code terminal",
+  "version": "0.1.0",
+  "publisher": "aetherx",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": ["Other"],
+  "activationEvents": [
+    "onUri",
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "Dev Inspector Bridge",
+      "properties": {
+        "devInspector.wsPort": {
+          "type": "number",
+          "default": 19854,
+          "description": "WebSocket server port for browser communication"
+        },
+        "devInspector.claudePath": {
+          "type": "string",
+          "default": "claude",
+          "description": "Path to the Claude CLI binary"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.80.0",
+    "@types/ws": "^8.5.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "ws": "^8.16.0"
+  }
+}

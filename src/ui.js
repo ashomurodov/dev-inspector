@@ -816,6 +816,249 @@ export function injectStyles() {
 
     /* ── Inspect cursor mode ── */
     body.di-inspect-mode * { cursor: crosshair !important; }
+
+    /* ── Agentic mode button (above the cog) ── */
+    #__dev_inspector_agentic_btn__ {
+      position: fixed;
+      bottom: 74px;
+      right: 20px;
+      z-index: 2147483640;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: #18181b;
+      border: 1.5px solid #3f3f46;
+      color: #a1a1aa;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+      transition: background 0.15s, transform 0.15s, border-color 0.15s, color 0.15s;
+      font-family: system-ui, sans-serif;
+      user-select: none;
+    }
+    #__dev_inspector_agentic_btn__:hover { background: #27272a; transform: scale(1.08); color: #c4b5fd; border-color: #6366f1; }
+    #__dev_inspector_agentic_btn__.active { background: #4c1d95; border-color: #7c3aed; color: #fff; }
+    #__dev_inspector_agentic_btn__ svg { pointer-events: none; }
+
+    /* ── Agentic cursor mode ── */
+    body.di-agentic-mode * { cursor: crosshair !important; }
+    body.di-agentic-mode #__dev_inspector_agentic_btn__ { cursor: pointer !important; }
+    body.di-agentic-mode #__dev_inspector__ { cursor: pointer !important; }
+
+    /* ── Agentic overlay (purple highlight for agentic selection) ── */
+    .di-agentic-hover {
+      position: fixed;
+      z-index: 2147483638;
+      pointer-events: none;
+      border: 2px solid #7c3aed;
+      background: rgba(124,58,237,0.1);
+      border-radius: 3px;
+      box-sizing: border-box;
+      transition: all 0.08s ease-out;
+    }
+
+    /* ── Prompt popover ── */
+    #__dev_inspector_prompt__ {
+      position: fixed;
+      z-index: 2147483645;
+      width: 340px;
+      background: #18181b;
+      border: 1px solid #3f3f46;
+      border-radius: 12px;
+      box-shadow: 0 12px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(99,102,241,0.15);
+      font-family: system-ui, -apple-system, sans-serif;
+      font-size: 13px;
+      color: #e4e4e7;
+      overflow: hidden;
+    }
+    .di-prompt-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      border-bottom: 1px solid #27272a;
+      background: #1c1c1f;
+    }
+    .di-prompt-element-label {
+      font-family: 'SF Mono', monospace;
+      font-size: 11px;
+      color: #7c3aed;
+      font-weight: 600;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1;
+    }
+    .di-prompt-close {
+      width: 22px; height: 22px;
+      background: #27272a;
+      border: none;
+      border-radius: 5px;
+      color: #71717a;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px;
+      transition: background 0.12s, color 0.12s;
+      flex-shrink: 0;
+    }
+    .di-prompt-close:hover { background: #3f3f46; color: #fff; }
+    .di-prompt-body { padding: 10px 14px; }
+    .di-prompt-input {
+      width: 100%;
+      background: #27272a;
+      border: 1px solid #3f3f46;
+      border-radius: 8px;
+      color: #f4f4f5;
+      font-size: 13px;
+      font-family: system-ui, sans-serif;
+      padding: 10px 12px;
+      outline: none;
+      resize: vertical;
+      min-height: 52px;
+      max-height: 200px;
+      line-height: 1.5;
+      box-sizing: border-box;
+      transition: border-color 0.12s;
+    }
+    .di-prompt-input:focus { border-color: #7c3aed; }
+    .di-prompt-input::placeholder { color: #52525b; }
+    .di-prompt-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 14px 12px;
+      gap: 8px;
+    }
+    .di-prompt-hint {
+      font-size: 10px;
+      color: #52525b;
+      flex: 1;
+    }
+    .di-prompt-apply {
+      padding: 7px 16px;
+      background: #7c3aed;
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: system-ui, sans-serif;
+      transition: background 0.12s, transform 0.1s;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .di-prompt-apply:hover { background: #6d28d9; }
+    .di-prompt-apply:active { transform: scale(0.97); }
+    .di-prompt-apply:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* ── Agent status panel (bottom-left) ── */
+    #__dev_inspector_agent_status__ {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      z-index: 2147483644;
+      display: flex;
+      flex-direction: column-reverse;
+      gap: 8px;
+      max-height: 300px;
+      overflow-y: auto;
+      pointer-events: auto;
+    }
+    .di-agent-card {
+      width: 280px;
+      background: #18181b;
+      border: 1px solid #3f3f46;
+      border-radius: 10px;
+      font-family: system-ui, sans-serif;
+      font-size: 12px;
+      color: #e4e4e7;
+      overflow: hidden;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      animation: diSlideUp 0.25s ease-out;
+    }
+    @keyframes diSlideUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .di-agent-card-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      border-bottom: 1px solid #27272a;
+      background: #1c1c1f;
+    }
+    .di-agent-element {
+      flex: 1;
+      font-family: 'SF Mono', monospace;
+      font-size: 10px;
+      color: #a78bfa;
+      font-weight: 600;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .di-agent-status {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 10px;
+      flex-shrink: 0;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .di-agent-starting { background: #27272a; color: #a1a1aa; }
+    .di-agent-running { background: #1e1b4b; color: #818cf8; }
+    .di-agent-done { background: #052e16; color: #4ade80; }
+    .di-agent-error { background: #450a0a; color: #f87171; }
+    .di-agent-cancel {
+      width: 18px; height: 18px;
+      background: transparent;
+      border: none;
+      border-radius: 4px;
+      color: #52525b;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 10px;
+      transition: color 0.12s, background 0.12s;
+      flex-shrink: 0;
+      padding: 0;
+    }
+    .di-agent-cancel:hover { color: #f87171; background: #27272a; }
+    .di-agent-progress { padding: 8px 10px; }
+    .di-agent-step {
+      font-size: 11px;
+      color: #71717a;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .di-agent-card.done { border-color: #166534; }
+    .di-agent-card.error { border-color: #7f1d1d; }
+    .di-agent-card.fade-out { animation: diFadeOut 0.5s ease forwards; }
+    @keyframes diFadeOut {
+      from { opacity: 1; transform: translateY(0); }
+      to { opacity: 0; transform: translateY(-8px); }
+    }
+
+    /* ── Agentic mode flash messages ── */
+    .di-agentic-flash {
+      position: fixed;
+      bottom: 76px;
+      left: 20px;
+      background: #7c3aed;
+      color: #fff;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      font-family: system-ui, sans-serif;
+      z-index: 2147483645;
+      animation: diFadeUp 2.5s ease forwards;
+    }
   `
   document.head.appendChild(style)
 }

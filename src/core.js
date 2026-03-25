@@ -1,7 +1,9 @@
-import { injectStyles, createCogButton, createOverlay, createTooltip, createPanel, createBoxModelOverlay, updateOverlay, showCopiedFlash, createHoverOverlay, updateHoverOverlay, createSpacingOverlay, hideSpacing, updateSpacing } from './ui.js'
+import { injectStyles, createCogButton, createOverlay, createTooltip, createPanel, createBoxModelOverlay, updateOverlay, showCopiedFlash, createHoverOverlay, updateHoverOverlay, createSpacingOverlay, hideSpacing, updateSpacing, buildSelector } from './ui.js'
 import { isInspectorElement, getElementStyles, getVueComponent, getReactComponent, renderTooltip, updateBoxModel, hideBoxModel } from './inspector.js'
 import { renderEditPanel, captureOriginals } from './editor.js'
 import { createChangeTracker, copyToClipboard } from './feedback.js'
+import { createAgenticClient, sendToAgent } from './agentic.js'
+import { createAgenticButton, createPromptPopover, positionPromptPopover, createStatusPanel, createSessionCard, updateSessionStep, updateSessionStatus } from './agentic-ui.js'
 
 const isLocalhost = ['localhost', '127.0.0.1', '::1'].includes(location.hostname)
   || location.hostname.endsWith('.local')
@@ -21,6 +23,10 @@ export function init(options = {}) {
   const hoverOverlay   = createHoverOverlay()
   const spacingContainer = createSpacingOverlay()
   const tracker        = createChangeTracker()
+  const agenticBtn     = createAgenticButton()
+  const promptPopover  = createPromptPopover()
+  const statusPanel    = createStatusPanel()
+  const agenticClient  = createAgenticClient()
 
   let inspecting        = false
   let panelOpen         = false
@@ -33,6 +39,9 @@ export function init(options = {}) {
   let lastContextualHover  = null  // last element shown in hover — used to drive click
   let aKeyHeld             = false // A key held — show style tooltip on selected element
   let lastMousePos         = { x: 0, y: 0 } // last known mouse position for keydown-triggered tooltip
+  let agenticMode          = false // agentic selection mode active
+  let agenticHoverEl       = null  // element currently highlighted in agentic mode
+  let agenticHoverOverlay  = null  // purple hover overlay for agentic mode
 
   // ── Class stylesheet (for Class tab mode) ─────────────────────────────────
   let classRules   = {}
@@ -811,9 +820,246 @@ export function init(options = {}) {
     tooltip.style.display = 'none'
   }, true)
 
+  // ── Agentic mode ─────────────────────────────────────────────────────────
+
+  function startAgenticMode() {
+    agenticMode = true
+    agenticBtn.classList.add('active')
+    document.body.classList.add('di-agentic-mode')
+    // Create a hover overlay for agentic mode
+    if (!agenticHoverOverlay) {
+      agenticHoverOverlay = document.createElement('div')
+      agenticHoverOverlay.id = '__dev_inspector_agentic_hover__'
+      agenticHoverOverlay.className = 'di-agentic-hover'
+      agenticHoverOverlay.style.display = 'none'
+      document.body.appendChild(agenticHoverOverlay)
+    }
+  }
+
+  function stopAgenticMode() {
+    agenticMode = false
+    agenticBtn.classList.remove('active')
+    document.body.classList.remove('di-agentic-mode')
+    agenticHoverEl = null
+    if (agenticHoverOverlay) {
+      agenticHoverOverlay.style.display = 'none'
+    }
+    promptPopover.style.display = 'none'
+  }
+
+  function showPromptFor(el) {
+    agenticMode = false
+    agenticBtn.classList.remove('active')
+    document.body.classList.remove('di-agentic-mode')
+    if (agenticHoverOverlay) agenticHoverOverlay.style.display = 'none'
+
+    // Set element label in popover
+    const tag = el.tagName.toLowerCase()
+    const id = el.id ? `#${el.id}` : ''
+    const cls = [...el.classList]
+      .filter(c => !c.startsWith('di-') && !c.startsWith('__dev'))
+      .slice(0, 2).map(c => `.${c}`).join('')
+    const labelEl = promptPopover.querySelector('.di-prompt-element-label')
+    if (labelEl) labelEl.textContent = `${tag}${id}${cls}`
+
+    // Clear previous input
+    const input = promptPopover.querySelector('.di-prompt-input')
+    if (input) { input.value = ''; }
+
+    // Position and show
+    promptPopover.style.display = 'block'
+    positionPromptPopover(promptPopover, el)
+
+    // Focus the input
+    setTimeout(() => input?.focus(), 50)
+
+    // Store the target element
+    promptPopover._targetEl = el
+  }
+
+  // Agentic button click: toggle agentic mode
+  agenticBtn.addEventListener('click', () => {
+    if (agenticMode) {
+      stopAgenticMode()
+    } else {
+      // Close inspector panel if open
+      if (inspecting) stopInspect()
+      startAgenticMode()
+    }
+  })
+
+  // Agentic mode: hover highlight
+  document.addEventListener('mousemove', (e) => {
+    if (!agenticMode) return
+    const el = e.target
+    if (isInspectorElement(el)) {
+      if (agenticHoverOverlay) agenticHoverOverlay.style.display = 'none'
+      agenticHoverEl = null
+      return
+    }
+    agenticHoverEl = el
+    if (agenticHoverOverlay) {
+      const rect = el.getBoundingClientRect()
+      agenticHoverOverlay.style.display = 'block'
+      agenticHoverOverlay.style.top = rect.top + 'px'
+      agenticHoverOverlay.style.left = rect.left + 'px'
+      agenticHoverOverlay.style.width = rect.width + 'px'
+      agenticHoverOverlay.style.height = rect.height + 'px'
+    }
+  })
+
+  // Agentic mode: click to select element and show prompt
+  document.addEventListener('click', (e) => {
+    if (!agenticMode) return
+    const el = e.target
+    if (isInspectorElement(el)) return
+    e.preventDefault()
+    e.stopPropagation()
+    showPromptFor(el)
+  }, true)
+
+  // Prompt popover: close button
+  promptPopover.querySelector('.di-prompt-close')?.addEventListener('click', () => {
+    promptPopover.style.display = 'none'
+    promptPopover._targetEl = null
+  })
+
+  // Prompt popover: apply button
+  promptPopover.querySelector('.di-prompt-apply')?.addEventListener('click', async () => {
+    const input = promptPopover.querySelector('.di-prompt-input')
+    const applyBtn = promptPopover.querySelector('.di-prompt-apply')
+    const el = promptPopover._targetEl
+    const instruction = input?.value?.trim()
+
+    if (!el || !instruction) return
+
+    applyBtn.disabled = true
+    applyBtn.textContent = 'Sending...'
+
+    try {
+      const result = await sendToAgent(agenticClient, el, instruction, {
+        rootPath,
+        tracker,
+        cwd: '', // Will be resolved by the extension
+      })
+
+      promptPopover.style.display = 'none'
+      promptPopover._targetEl = null
+
+      if (result.method === 'extension') {
+        // Add session card to status panel
+        const selector = buildSelector(el)
+        const card = createSessionCard(result.sessionId, selector)
+        statusPanel.appendChild(card)
+      } else if (result.method === 'clipboard') {
+        // Show flash message
+        const flash = document.createElement('div')
+        flash.className = 'di-agentic-flash'
+        flash.textContent = result.copied
+          ? 'Claude command copied! Paste in your terminal.'
+          : 'Could not connect to extension or copy to clipboard.'
+        document.body.appendChild(flash)
+        setTimeout(() => flash.remove(), 2800)
+      }
+    } catch (err) {
+      const flash = document.createElement('div')
+      flash.className = 'di-agentic-flash'
+      flash.textContent = 'Error: ' + (err.message || 'Unknown error')
+      document.body.appendChild(flash)
+      setTimeout(() => flash.remove(), 2800)
+    } finally {
+      applyBtn.disabled = false
+      applyBtn.textContent = 'Apply with Claude'
+    }
+  })
+
+  // Prompt popover: Ctrl+Enter to apply
+  promptPopover.querySelector('.di-prompt-input')?.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault()
+      promptPopover.querySelector('.di-prompt-apply')?.click()
+    }
+    // Escape to close
+    if (e.key === 'Escape') {
+      promptPopover.style.display = 'none'
+      promptPopover._targetEl = null
+    }
+  })
+
+  // Agentic client event handler: update status panel cards
+  agenticClient.onEvent((event) => {
+    const card = event.sessionId
+      ? statusPanel.querySelector(`.di-agent-card[data-session-id="${event.sessionId}"]`)
+      : null
+
+    switch (event.type) {
+      case 'session:started':
+        if (card) updateSessionStatus(card, 'running')
+        break
+
+      case 'session:progress':
+        if (card && event.step) updateSessionStep(card, event.step)
+        break
+
+      case 'session:complete':
+        if (card) {
+          updateSessionStatus(card, 'done')
+          updateSessionStep(card, event.summary || 'Changes applied')
+          card.classList.add('done')
+          // Auto-remove after 8 seconds
+          setTimeout(() => {
+            card.classList.add('fade-out')
+            setTimeout(() => card.remove(), 500)
+          }, 8000)
+        }
+        break
+
+      case 'session:error':
+        if (card) {
+          updateSessionStatus(card, 'error')
+          updateSessionStep(card, event.error || 'Something went wrong')
+          card.classList.add('error')
+        }
+        break
+
+      case 'session:cancelled':
+        if (card) {
+          updateSessionStatus(card, 'cancelled')
+          setTimeout(() => {
+            card.classList.add('fade-out')
+            setTimeout(() => card.remove(), 500)
+          }, 3000)
+        }
+        break
+    }
+  })
+
+  // Status panel: cancel button delegation
+  statusPanel.addEventListener('click', (e) => {
+    const cancelBtn = e.target.closest('.di-agent-cancel')
+    if (!cancelBtn) return
+    const card = cancelBtn.closest('.di-agent-card')
+    const sessionId = card?.dataset?.sessionId
+    if (sessionId) agenticClient.cancelSession(sessionId)
+  })
+
+  // Escape key closes agentic mode and prompt
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      if (promptPopover.style.display !== 'none') {
+        promptPopover.style.display = 'none'
+        promptPopover._targetEl = null
+      } else if (agenticMode) {
+        stopAgenticMode()
+      }
+    }
+  })
+
   return {
     destroy() {
       textEditCleanup()
+      stopAgenticMode()
+      agenticClient.disconnect()
       cog.remove()
       overlay.remove()
       tooltip.remove()
@@ -821,11 +1067,16 @@ export function init(options = {}) {
       bm.remove()
       hoverOverlay.remove()
       spacingContainer.remove()
+      agenticBtn.remove()
+      promptPopover.remove()
+      statusPanel.remove()
+      agenticHoverOverlay?.remove()
       classStyleEl?.remove()
       classStyleEl = null
       classRules = {}
       document.getElementById('__dev_inspector_styles__')?.remove()
       document.body.classList.remove('di-inspect-mode')
+      document.body.classList.remove('di-agentic-mode')
       document.body.style.marginRight = ''
       document.body.style.transition = ''
     }

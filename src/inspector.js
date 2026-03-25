@@ -8,6 +8,10 @@ const IGNORED_IDS = [
   '__dev_inspector_hover_overlay__',
   '__dev_inspector_spacing__',
   '__dev_inspector_boxmodel__',
+  '__dev_inspector_agentic_btn__',
+  '__dev_inspector_prompt__',
+  '__dev_inspector_agent_status__',
+  '__dev_inspector_agentic_hover__',
 ]
 
 export function isInspectorElement(el) {
@@ -15,6 +19,8 @@ export function isInspectorElement(el) {
   if (IGNORED_IDS.includes(el.id)) return true
   if (el.closest('#__dev_inspector_panel__')) return true
   if (el.closest('#__dev_inspector__')) return true
+  if (el.closest('#__dev_inspector_prompt__')) return true
+  if (el.closest('#__dev_inspector_agent_status__')) return true
   return false
 }
 
