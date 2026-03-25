@@ -996,7 +996,7 @@ export function init(options = {}) {
       case 'session:started':
         if (card) {
           updateSessionStatus(card, 'running')
-          addLogEntry(card, { type: 'system', icon: '⚡', text: 'Claude session started' })
+          // Don't add log here — the system:init event from stream-json handles it
         }
         break
 
@@ -1079,7 +1079,6 @@ export function init(options = {}) {
   })
 
   async function submitFollowUp(card, oldSessionId, instruction, input) {
-    // Get the element selector from the card to find context
     const elementLabel = card.querySelector('.di-agent-element')?.textContent || ''
     input.value = ''
     input.disabled = true
@@ -1089,20 +1088,18 @@ export function init(options = {}) {
     if (followup) followup.style.display = 'none'
     card.classList.remove('done')
 
-    // Add a log entry for the follow-up
     addLogEntry(card, { type: 'system', icon: '💬', text: `Follow-up: ${instruction}` })
     updateSessionStatus(card, 'starting')
 
-    // Build a simpler follow-up prompt (no need for full element context again)
-    const followUpPrompt = `Continue editing the same element: ${elementLabel}\n\nThe user wants an additional change: "${instruction}"\n\nApply this change to the same file you just edited. Keep all previous changes intact.`
-
-    // Start a new session
+    // Use --resume to continue the same Claude conversation
+    // Claude will have full context of what it did before
     const newSessionId = crypto.randomUUID()
     card.dataset.sessionId = newSessionId
 
     const isConnected = agenticClient.isConnected() || await agenticClient.connect()
     if (isConnected) {
-      agenticClient.startSession(newSessionId, followUpPrompt, '', elementLabel)
+      // Use startFollowUp which sends session:followup with Claude session ID for --resume
+      agenticClient.startFollowUp(newSessionId, instruction, '', elementLabel, oldSessionId)
     }
     input.disabled = false
   }

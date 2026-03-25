@@ -10,31 +10,43 @@ export interface ClaudeEvent {
   input?: Record<string, unknown>;
   cost?: number;
   duration?: number;
+  duration_ms?: number;
+  num_turns?: number;
+  is_error?: boolean;
+  session_id?: string;
+  message?: Record<string, unknown>;
 }
 
-/**
- * Spawns `claude -p "prompt" --output-format stream-json` and emits
- * parsed events as they arrive from stdout.
- */
 export class ClaudeRunner extends EventEmitter {
   private process: ChildProcess | null = null;
   private killed = false;
+  public claudeSessionId: string | null = null;
 
   constructor(
     private claudePath: string,
     private prompt: string,
     private cwd: string,
+    private resumeSessionId?: string,
   ) {
     super();
   }
 
   start(): void {
-    const args = [
-      '-p', this.prompt,
+    const args: string[] = [];
+
+    if (this.resumeSessionId) {
+      // Resume a previous conversation
+      args.push('--resume', this.resumeSessionId);
+      args.push('-p', this.prompt);
+    } else {
+      args.push('-p', this.prompt);
+    }
+
+    args.push(
       '--output-format', 'stream-json',
       '--verbose',
       '--allowedTools', 'Read,Edit,Write,Glob,Grep,Bash',
-    ];
+    );
 
     this.process = spawn(this.claudePath, args, {
       cwd: this.cwd || undefined,
@@ -47,16 +59,19 @@ export class ClaudeRunner extends EventEmitter {
     this.process.stdout?.on('data', (chunk: Buffer) => {
       buffer += chunk.toString();
       const lines = buffer.split('\n');
-      buffer = lines.pop() || ''; // keep incomplete line in buffer
+      buffer = lines.pop() || '';
 
       for (const line of lines) {
         const trimmed = line.trim();
         if (!trimmed) continue;
         try {
           const event: ClaudeEvent = JSON.parse(trimmed);
+          // Capture Claude's internal session ID from init event
+          if (event.type === 'system' && event.subtype === 'init' && event.session_id) {
+            this.claudeSessionId = event.session_id;
+          }
           this.emit('event', event);
         } catch {
-          // Not JSON — might be plain text output
           this.emit('event', { type: 'assistant', subtype: 'text', content: trimmed });
         }
       }
@@ -84,7 +99,6 @@ export class ClaudeRunner extends EventEmitter {
     this.killed = true;
     if (this.process) {
       this.process.kill('SIGTERM');
-      // Force kill after 5 seconds
       setTimeout(() => {
         if (this.process && !this.process.killed) {
           this.process.kill('SIGKILL');

@@ -7,15 +7,12 @@ interface IncomingMessage {
   prompt?: string;
   cwd?: string;
   elementSelector?: string;
+  claudeSessionId?: string;
+  previousSessionId?: string;
 }
 
 type LogFn = (msg: string) => void;
 
-/**
- * Local WebSocket server that accepts connections from the browser-side
- * dev-inspector. Handles session lifecycle messages and relays progress
- * events back to the browser.
- */
 export class WsServer {
   private wss: WebSocketServer | null = null;
   private port: number;
@@ -36,7 +33,7 @@ export class WsServer {
   }
 
   private tryListen(port: number, attempt = 0): Promise<number> {
-    const maxAttempts = 6; // try ports 19854-19860
+    const maxAttempts = 6;
 
     return new Promise((resolve, reject) => {
       const wss = new WebSocketServer({ port, host: 'localhost' });
@@ -78,7 +75,6 @@ export class WsServer {
         this.clients.delete(ws);
       });
 
-      // Send a welcome/ping
       ws.send(JSON.stringify({ type: 'pong' }));
     });
   }
@@ -96,6 +92,25 @@ export class WsServer {
             cwd,
             msg.elementSelector || '',
             ws,
+          );
+        }
+        break;
+
+      case 'session:followup':
+        if (msg.sessionId && msg.prompt) {
+          const cwd = msg.cwd || this.getWorkspaceCwd();
+          // Look up the Claude session ID to resume
+          const claudeSessionId = msg.claudeSessionId ||
+            (msg.previousSessionId ? this.sessions.getClaudeSessionId(msg.previousSessionId) : null);
+
+          this.log(`Follow-up for ${msg.sessionId.slice(0, 8)}... (resume: ${claudeSessionId || 'none'})`);
+          this.sessions.startSession(
+            msg.sessionId,
+            msg.prompt,
+            cwd,
+            msg.elementSelector || '',
+            ws,
+            claudeSessionId || undefined,
           );
         }
         break;

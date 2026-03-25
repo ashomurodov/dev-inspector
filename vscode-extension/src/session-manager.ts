@@ -7,12 +7,9 @@ interface Session {
   ws: WebSocket | null;
   status: 'starting' | 'running' | 'done' | 'error' | 'cancelled';
   elementSelector: string;
+  claudeSessionId: string | null;
 }
 
-/**
- * Manages multiple concurrent Claude sessions.
- * Routes events from ClaudeRunner instances back through WebSocket to the browser.
- */
 type LogFn = (msg: string) => void;
 
 export class SessionManager {
@@ -20,6 +17,8 @@ export class SessionManager {
   private claudePath: string;
   private maxSessions = 5;
   private log: LogFn;
+  // Store completed Claude session IDs so follow-ups can resume them
+  private completedClaudeSessions = new Map<string, string>(); // browserSessionId -> claudeSessionId
 
   constructor(claudePath: string, log?: LogFn) {
     this.claudePath = claudePath;
@@ -36,6 +35,7 @@ export class SessionManager {
     cwd: string,
     elementSelector: string,
     ws: WebSocket | null,
+    resumeClaudeSessionId?: string,
   ): boolean {
     if (this.sessions.size >= this.maxSessions) {
       this.sendToWs(ws, {
@@ -46,12 +46,13 @@ export class SessionManager {
       return false;
     }
 
-    this.log(`Starting Claude: ${this.claudePath} -p "..." --output-format stream-json --verbose`);
+    const isResume = !!resumeClaudeSessionId;
+    this.log(`${isResume ? 'Resuming' : 'Starting'} Claude session for ${sessionId.slice(0, 8)}`);
     this.log(`Working directory: ${cwd}`);
     this.log(`Prompt length: ${prompt.length} chars`);
-    this.log(`Prompt preview: ${prompt.slice(0, 300)}...`);
+    if (isResume) this.log(`Resuming Claude session: ${resumeClaudeSessionId}`);
 
-    const runner = new ClaudeRunner(this.claudePath, prompt, cwd);
+    const runner = new ClaudeRunner(this.claudePath, prompt, cwd, resumeClaudeSessionId);
 
     const session: Session = {
       id: sessionId,
@@ -59,15 +60,21 @@ export class SessionManager {
       ws,
       status: 'starting',
       elementSelector,
+      claudeSessionId: resumeClaudeSessionId || null,
     };
 
     this.sessions.set(sessionId, session);
 
-    // Wire up runner events
     let eventCount = 0;
     runner.on('event', (event: ClaudeEvent) => {
       eventCount++;
       this.log(`Session ${sessionId.slice(0, 8)} event #${eventCount}: ${JSON.stringify(event).slice(0, 200)}`);
+
+      // Capture Claude session ID
+      if (runner.claudeSessionId && !session.claudeSessionId) {
+        session.claudeSessionId = runner.claudeSessionId;
+        this.log(`Claude session ID captured: ${session.claudeSessionId}`);
+      }
 
       if (session.status === 'starting') {
         session.status = 'running';
@@ -82,11 +89,19 @@ export class SessionManager {
 
       if (event.type === 'result') {
         session.status = 'done';
+        // Store the Claude session ID for future follow-ups
+        if (session.claudeSessionId) {
+          this.completedClaudeSessions.set(sessionId, session.claudeSessionId);
+        }
+        const duration = event.duration_ms ? `${(event.duration_ms / 1000).toFixed(1)}s` : '';
+        const turns = event.num_turns ? `${event.num_turns} turns` : '';
+        const parts = [turns, duration].filter(Boolean).join(' · ');
         this.sendToWs(session.ws, {
           type: 'session:complete',
           sessionId,
-          success: true,
-          summary: 'Changes applied successfully',
+          success: !event.is_error,
+          summary: parts ? `Done (${parts})` : 'Done',
+          claudeSessionId: session.claudeSessionId,
         });
         this.cleanupSession(sessionId);
       }
@@ -105,17 +120,14 @@ export class SessionManager {
 
     runner.on('stderr', (text: string) => {
       this.log(`Session ${sessionId.slice(0, 8)} stderr: ${text}`);
-      // Forward stderr as progress text
-      this.sendToWs(session.ws, {
-        type: 'session:progress',
-        sessionId,
-        event: { type: 'assistant', subtype: 'text', content: text },
-      });
     });
 
     runner.on('done', (code: number | null) => {
       this.log(`Session ${sessionId.slice(0, 8)} exited with code ${code} (received ${eventCount} events)`);
       if (session.status !== 'done' && session.status !== 'cancelled') {
+        if (session.claudeSessionId) {
+          this.completedClaudeSessions.set(sessionId, session.claudeSessionId);
+        }
         if (code !== 0) {
           session.status = 'error';
           this.sendToWs(session.ws, {
@@ -129,16 +141,20 @@ export class SessionManager {
             type: 'session:complete',
             sessionId,
             success: true,
-            summary: 'Changes applied successfully',
+            summary: 'Done',
+            claudeSessionId: session.claudeSessionId,
           });
         }
         this.cleanupSession(sessionId);
       }
     });
 
-    // Start the runner
     runner.start();
     return true;
+  }
+
+  getClaudeSessionId(browserSessionId: string): string | null {
+    return this.completedClaudeSessions.get(browserSessionId) || null;
   }
 
   cancelSession(sessionId: string): void {
@@ -164,7 +180,6 @@ export class SessionManager {
   }
 
   private cleanupSession(sessionId: string): void {
-    // Keep session reference for a bit so late messages can still be routed
     setTimeout(() => {
       this.sessions.delete(sessionId);
     }, 30000);
@@ -181,5 +196,6 @@ export class SessionManager {
       session.runner.cancel();
     }
     this.sessions.clear();
+    this.completedClaudeSessions.clear();
   }
 }
