@@ -5,16 +5,31 @@ import { execSync } from 'child_process';
 
 let wsServer: WsServer | null = null;
 let sessionManager: SessionManager | null = null;
+let outputChannel: vscode.OutputChannel | null = null;
+
+function log(msg: string): void {
+  const timestamp = new Date().toLocaleTimeString();
+  outputChannel?.appendLine(`[${timestamp}] ${msg}`);
+}
 
 export function activate(context: vscode.ExtensionContext): void {
+  // Create output channel so users can see what's happening
+  outputChannel = vscode.window.createOutputChannel('Dev Inspector Bridge');
+  context.subscriptions.push(outputChannel);
+  outputChannel.show(true); // show but don't steal focus
+
+  log('Extension activating...');
+
   const config = vscode.workspace.getConfiguration('devInspector');
   const wsPort = config.get<number>('wsPort', 19854);
   const claudePath = config.get<string>('claudePath', 'claude');
 
   // Verify claude CLI is available
   try {
-    execSync(`${claudePath} --version`, { stdio: 'pipe' });
+    const version = execSync(`${claudePath} --version`, { stdio: 'pipe' }).toString().trim();
+    log(`Claude CLI found: ${version}`);
   } catch {
+    log('WARNING: Claude CLI not found on PATH');
     vscode.window.showWarningMessage(
       'Dev Inspector Bridge: Claude CLI not found. Install it from https://claude.ai/code or set devInspector.claudePath in settings.',
     );
@@ -22,15 +37,19 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // Initialize session manager
   sessionManager = new SessionManager(claudePath);
+  log('Session manager initialized');
 
   // Start WebSocket server
   wsServer = new WsServer(wsPort, sessionManager);
   wsServer.start().then(
     (port) => {
-      console.log(`Dev Inspector Bridge: WebSocket server running on port ${port}`);
+      log(`WebSocket server running on localhost:${port}`);
+      vscode.window.showInformationMessage(
+        `Dev Inspector Bridge: Ready on port ${port}`,
+      );
     },
     (err) => {
-      console.error('Dev Inspector Bridge: Failed to start WebSocket server', err);
+      log(`ERROR: Failed to start WebSocket server — ${err.message}`);
       vscode.window.showErrorMessage(
         `Dev Inspector Bridge: Failed to start WebSocket server — ${err.message}`,
       );
@@ -45,14 +64,12 @@ export function activate(context: vscode.ExtensionContext): void {
 
       if (!sessionId) return;
 
-      // Show notification that a session was triggered
+      log(`URI handler triggered — session ${sessionId.slice(0, 8)}...`);
+
       vscode.window.showInformationMessage(
         `Dev Inspector: AI agent session started (${sessionId.slice(0, 8)}...)`,
       );
 
-      // If the session hasn't been started via WebSocket yet, it will be
-      // started when the browser connects. The URI is just a wake-up call
-      // to ensure VS Code is in the foreground.
       vscode.commands.executeCommand('workbench.action.focusActiveEditorGroup');
     },
   });
@@ -64,6 +81,7 @@ export function activate(context: vscode.ExtensionContext): void {
       if (e.affectsConfiguration('devInspector.claudePath')) {
         const newPath = vscode.workspace.getConfiguration('devInspector').get<string>('claudePath', 'claude');
         sessionManager?.setClaudePath(newPath);
+        log(`Claude path updated to: ${newPath}`);
       }
     }),
   );
@@ -75,9 +93,12 @@ export function activate(context: vscode.ExtensionContext): void {
       sessionManager?.dispose();
     },
   });
+
+  log('Extension activated successfully');
 }
 
 export function deactivate(): void {
+  outputChannel?.appendLine('Extension deactivating...');
   wsServer?.dispose();
   sessionManager?.dispose();
   wsServer = null;
