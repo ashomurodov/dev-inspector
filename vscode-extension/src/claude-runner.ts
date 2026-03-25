@@ -29,12 +29,12 @@ export class ClaudeRunner extends EventEmitter {
   }
 
   start(): void {
-    const args = ['-p', this.prompt, '--output-format', 'stream-json'];
+    const args = ['-p', this.prompt, '--output-format', 'stream-json', '--verbose'];
 
     this.process = spawn(this.claudePath, args, {
       cwd: this.cwd || undefined,
       env: { ...process.env },
-      stdio: ['pipe', 'pipe', 'pipe'],
+      stdio: ['ignore', 'pipe', 'pipe'],
     });
 
     let buffer = '';
