@@ -13,13 +13,17 @@ interface Session {
  * Manages multiple concurrent Claude sessions.
  * Routes events from ClaudeRunner instances back through WebSocket to the browser.
  */
+type LogFn = (msg: string) => void;
+
 export class SessionManager {
   private sessions = new Map<string, Session>();
   private claudePath: string;
   private maxSessions = 5;
+  private log: LogFn;
 
-  constructor(claudePath: string) {
+  constructor(claudePath: string, log?: LogFn) {
     this.claudePath = claudePath;
+    this.log = log || (() => {});
   }
 
   setClaudePath(path: string): void {
@@ -41,6 +45,9 @@ export class SessionManager {
       });
       return false;
     }
+
+    this.log(`Starting Claude: ${this.claudePath} -p "..." --output-format stream-json`);
+    this.log(`Working directory: ${cwd}`);
 
     const runner = new ClaudeRunner(this.claudePath, prompt, cwd);
 
@@ -80,6 +87,7 @@ export class SessionManager {
     });
 
     runner.on('error', (err: Error) => {
+      this.log(`Session ${sessionId.slice(0, 8)} error: ${err.message}`);
       session.status = 'error';
       this.sendToWs(session.ws, {
         type: 'session:error',
@@ -90,6 +98,7 @@ export class SessionManager {
     });
 
     runner.on('stderr', (text: string) => {
+      this.log(`Session ${sessionId.slice(0, 8)} stderr: ${text}`);
       // Forward stderr as progress text
       this.sendToWs(session.ws, {
         type: 'session:progress',
@@ -99,6 +108,7 @@ export class SessionManager {
     });
 
     runner.on('done', (code: number | null) => {
+      this.log(`Session ${sessionId.slice(0, 8)} exited with code ${code}`);
       if (session.status !== 'done' && session.status !== 'cancelled') {
         if (code !== 0) {
           session.status = 'error';

@@ -36,11 +36,21 @@ export function activate(context: vscode.ExtensionContext): void {
   }
 
   // Initialize session manager
-  sessionManager = new SessionManager(claudePath);
+  sessionManager = new SessionManager(claudePath, log);
   log('Session manager initialized');
 
   // Start WebSocket server
-  wsServer = new WsServer(wsPort, sessionManager);
+  const getWorkspaceCwd = () => {
+    const folders = vscode.workspace.workspaceFolders;
+    if (folders && folders.length > 0) {
+      return folders[0].uri.fsPath;
+    }
+    return process.cwd();
+  };
+
+  log(`Workspace folder: ${getWorkspaceCwd()}`);
+
+  wsServer = new WsServer(wsPort, sessionManager, log, getWorkspaceCwd);
   wsServer.start().then(
     (port) => {
       log(`WebSocket server running on localhost:${port}`);
