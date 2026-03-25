@@ -46,8 +46,10 @@ export class SessionManager {
       return false;
     }
 
-    this.log(`Starting Claude: ${this.claudePath} -p "..." --output-format stream-json`);
+    this.log(`Starting Claude: ${this.claudePath} -p "..." --output-format stream-json --verbose`);
     this.log(`Working directory: ${cwd}`);
+    this.log(`Prompt length: ${prompt.length} chars`);
+    this.log(`Prompt preview: ${prompt.slice(0, 300)}...`);
 
     const runner = new ClaudeRunner(this.claudePath, prompt, cwd);
 
@@ -62,7 +64,11 @@ export class SessionManager {
     this.sessions.set(sessionId, session);
 
     // Wire up runner events
+    let eventCount = 0;
     runner.on('event', (event: ClaudeEvent) => {
+      eventCount++;
+      this.log(`Session ${sessionId.slice(0, 8)} event #${eventCount}: ${JSON.stringify(event).slice(0, 200)}`);
+
       if (session.status === 'starting') {
         session.status = 'running';
         this.sendToWs(session.ws, { type: 'session:started', sessionId });
@@ -108,7 +114,7 @@ export class SessionManager {
     });
 
     runner.on('done', (code: number | null) => {
-      this.log(`Session ${sessionId.slice(0, 8)} exited with code ${code}`);
+      this.log(`Session ${sessionId.slice(0, 8)} exited with code ${code} (received ${eventCount} events)`);
       if (session.status !== 'done' && session.status !== 'cancelled') {
         if (code !== 0) {
           session.status = 'error';
