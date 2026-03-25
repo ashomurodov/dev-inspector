@@ -290,6 +290,7 @@ export function createAgenticClient() {
       case 'session:complete':
         if (session) {
           session.status = 'done'
+          session.claudeSessionId = msg.claudeSessionId || null
           emit({ type: 'session:complete', sessionId: msg.sessionId, summary: msg.summary })
         }
         break
@@ -337,6 +338,7 @@ export function createAgenticClient() {
       steps: [],
       elementSelector,
       error: null,
+      claudeSessionId: null,
     })
 
     if (connected && ws?.readyState === WebSocket.OPEN) {
@@ -352,6 +354,32 @@ export function createAgenticClient() {
     // Trigger VS Code extension activation via URI
     const uri = `${VSCODE_URI_BASE}?sessionId=${encodeURIComponent(sessionId)}&wsPort=${currentPort || WS_PORTS[0]}`
     window.open(uri)
+  }
+
+  function startFollowUp(sessionId, prompt, cwd, elementSelector, previousSessionId) {
+    // Get the Claude session ID from the previous session for --resume
+    const prevSession = sessions.get(previousSessionId)
+    const claudeSessionId = prevSession?.claudeSessionId || null
+
+    sessions.set(sessionId, {
+      status: 'starting',
+      steps: [],
+      elementSelector,
+      error: null,
+      claudeSessionId: null,
+    })
+
+    if (connected && ws?.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({
+        type: 'session:followup',
+        sessionId,
+        prompt,
+        cwd,
+        elementSelector,
+        claudeSessionId,
+        previousSessionId,
+      }))
+    }
   }
 
   function cancelSession(sessionId) {
@@ -397,6 +425,7 @@ export function createAgenticClient() {
   return {
     connect,
     startSession,
+    startFollowUp,
     cancelSession,
     removeSession,
     onEvent,
