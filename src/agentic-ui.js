@@ -2,7 +2,7 @@
  * Agentic mode UI components:
  *   - Agentic mode toggle button (sparkle icon, next to cog)
  *   - Floating prompt popover (appears near selected element)
- *   - Status panel (bottom-left, shows active agent sessions)
+ *   - Status panel (bottom-left, shows active agent sessions with live feed)
  */
 
 // ── Agentic mode button (sits above the cog) ─────────────────────────────────
@@ -41,25 +41,17 @@ export function createPromptPopover() {
   return popover
 }
 
-/**
- * Positions the prompt popover near the target element.
- */
 export function positionPromptPopover(popover, el) {
   const rect = el.getBoundingClientRect()
   const vw = window.innerWidth
   const vh = window.innerHeight
-  const pw = 340 // popover width
-  const ph = 180 // approximate popover height
+  const pw = 340
+  const ph = 180
 
-  // Default: below and centered on element
   let top = rect.bottom + 12
   let left = rect.left + (rect.width - pw) / 2
 
-  // If below would go off-screen, show above
-  if (top + ph > vh - 20) {
-    top = rect.top - ph - 12
-  }
-  // Clamp to viewport
+  if (top + ph > vh - 20) top = rect.top - ph - 12
   if (left < 12) left = 12
   if (left + pw > vw - 12) left = vw - pw - 12
   if (top < 12) top = 12
@@ -78,7 +70,7 @@ export function createStatusPanel() {
 }
 
 /**
- * Creates a session card DOM node.
+ * Creates a rich session card with activity log and follow-up input.
  */
 export function createSessionCard(sessionId, elementSelector) {
   const card = document.createElement('div')
@@ -88,21 +80,132 @@ export function createSessionCard(sessionId, elementSelector) {
     <div class="di-agent-card-header">
       <span class="di-agent-element">${escHtml(elementSelector)}</span>
       <span class="di-agent-status di-agent-starting">Starting</span>
+      <button class="di-agent-minimize" title="Minimize">─</button>
       <button class="di-agent-cancel" title="Cancel">✕</button>
     </div>
-    <div class="di-agent-progress">
-      <div class="di-agent-step">Connecting to Claude...</div>
+    <div class="di-agent-activity">
+      <div class="di-agent-activity-log">
+        <div class="di-agent-log-entry di-log-system">
+          <span class="di-log-icon">⚡</span>
+          <span class="di-log-text">Connecting to Claude...</span>
+        </div>
+      </div>
+    </div>
+    <div class="di-agent-followup" style="display:none;">
+      <div class="di-agent-followup-wrap">
+        <input class="di-agent-followup-input" placeholder="Follow-up instruction..." />
+        <button class="di-agent-followup-send" title="Send">→</button>
+      </div>
     </div>
   `
   return card
 }
 
+// ── Activity log helpers ──────────────────────────────────────────────────────
+
+const TOOL_ICONS = {
+  Read: '📄', Edit: '✏️', Write: '📝', Grep: '🔍',
+  Glob: '📁', Bash: '⚡', default: '🔧',
+}
+
 /**
- * Updates the step text on a session card.
+ * Parses a raw stream-json event into a displayable log entry object.
+ * Returns null if the event shouldn't be shown.
  */
-export function updateSessionStep(card, stepText) {
-  const stepEl = card.querySelector('.di-agent-step')
-  if (stepEl) stepEl.textContent = stepText
+export function parseEventToLogEntry(event) {
+  if (!event) return null
+
+  // Tool use events
+  if (event.type === 'assistant' && event.message?.content) {
+    const content = event.message.content
+    for (const block of content) {
+      if (block.type === 'tool_use') {
+        const tool = block.name || 'tool'
+        const input = block.input || {}
+        const icon = TOOL_ICONS[tool] || TOOL_ICONS.default
+        let text = `${tool}`
+
+        if (tool === 'Read' && input.file_path) {
+          text = `Reading ${shortenPath(input.file_path)}`
+        } else if (tool === 'Edit' && input.file_path) {
+          text = `Editing ${shortenPath(input.file_path)}`
+        } else if (tool === 'Write' && input.file_path) {
+          text = `Writing ${shortenPath(input.file_path)}`
+        } else if (tool === 'Grep' && input.pattern) {
+          text = `Searching: "${input.pattern.slice(0, 40)}"`
+        } else if (tool === 'Glob' && input.pattern) {
+          text = `Finding: ${input.pattern}`
+        } else if (tool === 'Bash' && input.command) {
+          text = `Running: ${input.command.slice(0, 50)}`
+        }
+
+        return { type: 'tool', icon, text }
+      }
+
+      if (block.type === 'text' && block.text) {
+        const text = block.text.trim()
+        if (text.length > 0 && text.length < 200) {
+          return { type: 'text', icon: '💬', text: text.slice(0, 120) }
+        }
+      }
+
+      if (block.type === 'thinking') {
+        return { type: 'thinking', icon: '🧠', text: 'Thinking...' }
+      }
+    }
+  }
+
+  // Tool results (file contents, search results, etc.)
+  if (event.type === 'user' && event.message?.content) {
+    for (const block of event.message.content) {
+      if (block.type === 'tool_result' && block.is_error) {
+        const errText = typeof block.content === 'string'
+          ? block.content.slice(0, 80)
+          : 'Tool error'
+        return { type: 'error', icon: '⚠️', text: errText }
+      }
+    }
+  }
+
+  // System init
+  if (event.type === 'system' && event.subtype === 'init') {
+    return { type: 'system', icon: '⚡', text: 'Claude session started' }
+  }
+
+  // Final result
+  if (event.type === 'result') {
+    const duration = event.duration_ms ? `${(event.duration_ms / 1000).toFixed(1)}s` : ''
+    const turns = event.num_turns ? `${event.num_turns} turns` : ''
+    const parts = [turns, duration].filter(Boolean).join(' · ')
+    return {
+      type: 'result',
+      icon: event.is_error ? '❌' : '✅',
+      text: event.is_error ? 'Failed' : `Done${parts ? ' (' + parts + ')' : ''}`,
+    }
+  }
+
+  return null
+}
+
+/**
+ * Adds a log entry to a session card's activity log.
+ */
+export function addLogEntry(card, entry) {
+  if (!entry) return
+  const log = card.querySelector('.di-agent-activity-log')
+  if (!log) return
+
+  const el = document.createElement('div')
+  el.className = `di-agent-log-entry di-log-${entry.type}`
+  el.innerHTML = `
+    <span class="di-log-icon">${entry.icon}</span>
+    <span class="di-log-text">${escHtml(entry.text)}</span>
+  `
+  log.appendChild(el)
+
+  // Auto-scroll to bottom
+  const activity = card.querySelector('.di-agent-activity')
+  if (activity) activity.scrollTop = activity.scrollHeight
 }
 
 /**
@@ -126,6 +229,9 @@ export function updateSessionStatus(card, status) {
     case 'done':
       statusEl.classList.add('di-agent-done')
       statusEl.textContent = 'Done'
+      // Show follow-up input
+      const followup = card.querySelector('.di-agent-followup')
+      if (followup) followup.style.display = 'block'
       break
     case 'error':
       statusEl.classList.add('di-agent-error')
@@ -140,4 +246,10 @@ export function updateSessionStatus(card, status) {
 
 function escHtml(str) {
   return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+function shortenPath(filePath) {
+  if (!filePath) return 'file'
+  const parts = filePath.replace(/\\/g, '/').split('/')
+  return parts.length > 2 ? `.../${parts.slice(-2).join('/')}` : parts.join('/')
 }

@@ -963,22 +963,25 @@ export function injectStyles() {
       display: flex;
       flex-direction: column-reverse;
       gap: 8px;
-      max-height: 300px;
-      overflow-y: auto;
+      max-height: calc(100vh - 40px);
       pointer-events: auto;
     }
     .di-agent-card {
-      width: 280px;
+      width: 320px;
       background: #18181b;
       border: 1px solid #3f3f46;
-      border-radius: 10px;
+      border-radius: 12px;
       font-family: system-ui, sans-serif;
       font-size: 12px;
       color: #e4e4e7;
       overflow: hidden;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
       animation: diSlideUp 0.25s ease-out;
+      display: flex;
+      flex-direction: column;
     }
+    .di-agent-card.minimized .di-agent-activity,
+    .di-agent-card.minimized .di-agent-followup { display: none !important; }
     @keyframes diSlideUp {
       from { opacity: 0; transform: translateY(12px); }
       to { opacity: 1; transform: translateY(0); }
@@ -986,10 +989,11 @@ export function injectStyles() {
     .di-agent-card-header {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
       padding: 8px 10px;
       border-bottom: 1px solid #27272a;
       background: #1c1c1f;
+      cursor: default;
     }
     .di-agent-element {
       flex: 1;
@@ -1002,9 +1006,9 @@ export function injectStyles() {
       white-space: nowrap;
     }
     .di-agent-status {
-      font-size: 10px;
+      font-size: 9px;
       font-weight: 600;
-      padding: 2px 8px;
+      padding: 2px 7px;
       border-radius: 10px;
       flex-shrink: 0;
       text-transform: uppercase;
@@ -1014,7 +1018,7 @@ export function injectStyles() {
     .di-agent-running { background: #1e1b4b; color: #818cf8; }
     .di-agent-done { background: #052e16; color: #4ade80; }
     .di-agent-error { background: #450a0a; color: #f87171; }
-    .di-agent-cancel {
+    .di-agent-minimize, .di-agent-cancel {
       width: 18px; height: 18px;
       background: transparent;
       border: none;
@@ -1027,15 +1031,93 @@ export function injectStyles() {
       flex-shrink: 0;
       padding: 0;
     }
+    .di-agent-minimize:hover { color: #a1a1aa; background: #27272a; }
     .di-agent-cancel:hover { color: #f87171; background: #27272a; }
-    .di-agent-progress { padding: 8px 10px; }
-    .di-agent-step {
-      font-size: 11px;
-      color: #71717a;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+
+    /* ── Activity log ── */
+    .di-agent-activity {
+      max-height: 200px;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      scroll-behavior: smooth;
     }
+    .di-agent-activity::-webkit-scrollbar { width: 3px; }
+    .di-agent-activity::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 2px; }
+    .di-agent-activity-log {
+      padding: 6px 0;
+    }
+    .di-agent-log-entry {
+      display: flex;
+      align-items: flex-start;
+      gap: 6px;
+      padding: 3px 10px;
+      animation: diLogFadeIn 0.15s ease-out;
+    }
+    @keyframes diLogFadeIn {
+      from { opacity: 0; transform: translateX(-4px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+    .di-log-icon {
+      flex-shrink: 0;
+      font-size: 10px;
+      line-height: 1.6;
+      width: 16px;
+      text-align: center;
+    }
+    .di-log-text {
+      font-size: 11px;
+      line-height: 1.5;
+      color: #a1a1aa;
+      word-break: break-word;
+    }
+    .di-log-tool .di-log-text { color: #c4b5fd; }
+    .di-log-thinking .di-log-text { color: #71717a; font-style: italic; }
+    .di-log-error .di-log-text { color: #f87171; }
+    .di-log-result .di-log-text { color: #4ade80; font-weight: 500; }
+    .di-log-system .di-log-text { color: #818cf8; }
+    .di-log-text .di-log-text { color: #e4e4e7; }
+
+    /* ── Follow-up input ── */
+    .di-agent-followup {
+      border-top: 1px solid #27272a;
+      padding: 8px 10px;
+      background: #1c1c1f;
+    }
+    .di-agent-followup-wrap {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+    .di-agent-followup-input {
+      flex: 1;
+      background: #27272a;
+      border: 1px solid #3f3f46;
+      border-radius: 6px;
+      color: #f4f4f5;
+      font-size: 11px;
+      font-family: system-ui, sans-serif;
+      padding: 6px 10px;
+      outline: none;
+      transition: border-color 0.12s;
+      min-width: 0;
+    }
+    .di-agent-followup-input:focus { border-color: #7c3aed; }
+    .di-agent-followup-input::placeholder { color: #52525b; }
+    .di-agent-followup-send {
+      width: 28px; height: 28px;
+      background: #7c3aed;
+      border: none;
+      border-radius: 6px;
+      color: #fff;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px;
+      font-weight: 700;
+      flex-shrink: 0;
+      transition: background 0.12s;
+    }
+    .di-agent-followup-send:hover { background: #6d28d9; }
+
     .di-agent-card.done { border-color: #166534; }
     .di-agent-card.error { border-color: #7f1d1d; }
     .di-agent-card.fade-out { animation: diFadeOut 0.5s ease forwards; }
