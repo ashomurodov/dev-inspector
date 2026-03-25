@@ -3,7 +3,7 @@ import { isInspectorElement, getElementStyles, getVueComponent, getReactComponen
 import { renderEditPanel, captureOriginals } from './editor.js'
 import { createChangeTracker, copyToClipboard } from './feedback.js'
 import { createAgenticClient, sendToAgent } from './agentic.js'
-import { createAgenticButton, createPromptPopover, positionPromptPopover, createStatusPanel, createSessionCard, updateSessionStep, updateSessionStatus } from './agentic-ui.js'
+import { createAgenticButton, createPromptPopover, positionPromptPopover, createStatusPanel, createSessionCard, updateSessionStatus, parseEventToLogEntry, addLogEntry } from './agentic-ui.js'
 
 const isLocalhost = ['localhost', '127.0.0.1', '::1'].includes(location.hostname)
   || location.hostname.endsWith('.local')
@@ -986,7 +986,7 @@ export function init(options = {}) {
     }
   })
 
-  // Agentic client event handler: update status panel cards
+  // Agentic client event handler: update status panel cards with live activity feed
   agenticClient.onEvent((event) => {
     const card = event.sessionId
       ? statusPanel.querySelector(`.di-agent-card[data-session-id="${event.sessionId}"]`)
@@ -994,36 +994,38 @@ export function init(options = {}) {
 
     switch (event.type) {
       case 'session:started':
-        if (card) updateSessionStatus(card, 'running')
+        if (card) {
+          updateSessionStatus(card, 'running')
+          addLogEntry(card, { type: 'system', icon: '⚡', text: 'Claude session started' })
+        }
         break
 
       case 'session:progress':
-        if (card && event.step) updateSessionStep(card, event.step)
+        if (card && event.rawEvent) {
+          const entry = parseEventToLogEntry(event.rawEvent)
+          if (entry) addLogEntry(card, entry)
+        }
         break
 
       case 'session:complete':
         if (card) {
+          addLogEntry(card, { type: 'result', icon: '✅', text: event.summary || 'Changes applied' })
           updateSessionStatus(card, 'done')
-          updateSessionStep(card, event.summary || 'Changes applied')
           card.classList.add('done')
-          // Auto-remove after 8 seconds
-          setTimeout(() => {
-            card.classList.add('fade-out')
-            setTimeout(() => card.remove(), 500)
-          }, 8000)
         }
         break
 
       case 'session:error':
         if (card) {
+          addLogEntry(card, { type: 'error', icon: '❌', text: event.error || 'Something went wrong' })
           updateSessionStatus(card, 'error')
-          updateSessionStep(card, event.error || 'Something went wrong')
           card.classList.add('error')
         }
         break
 
       case 'session:cancelled':
         if (card) {
+          addLogEntry(card, { type: 'error', icon: '🚫', text: 'Cancelled' })
           updateSessionStatus(card, 'cancelled')
           setTimeout(() => {
             card.classList.add('fade-out')
@@ -1034,14 +1036,76 @@ export function init(options = {}) {
     }
   })
 
-  // Status panel: cancel button delegation
+  // Status panel: cancel and minimize button delegation
   statusPanel.addEventListener('click', (e) => {
     const cancelBtn = e.target.closest('.di-agent-cancel')
-    if (!cancelBtn) return
-    const card = cancelBtn.closest('.di-agent-card')
-    const sessionId = card?.dataset?.sessionId
-    if (sessionId) agenticClient.cancelSession(sessionId)
+    if (cancelBtn) {
+      const card = cancelBtn.closest('.di-agent-card')
+      const sessionId = card?.dataset?.sessionId
+      if (sessionId) agenticClient.cancelSession(sessionId)
+      return
+    }
+    const minimizeBtn = e.target.closest('.di-agent-minimize')
+    if (minimizeBtn) {
+      const card = minimizeBtn.closest('.di-agent-card')
+      if (card) card.classList.toggle('minimized')
+      return
+    }
   })
+
+  // Status panel: follow-up input — send new instruction for the same element
+  statusPanel.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return
+    const input = e.target.closest('.di-agent-followup-input')
+    if (!input) return
+    const instruction = input.value.trim()
+    if (!instruction) return
+    const card = input.closest('.di-agent-card')
+    const sessionId = card?.dataset?.sessionId
+    if (!sessionId) return
+    submitFollowUp(card, sessionId, instruction, input)
+  })
+
+  statusPanel.addEventListener('click', (e) => {
+    const sendBtn = e.target.closest('.di-agent-followup-send')
+    if (!sendBtn) return
+    const card = sendBtn.closest('.di-agent-card')
+    const input = card?.querySelector('.di-agent-followup-input')
+    const instruction = input?.value?.trim()
+    if (!instruction || !card) return
+    const sessionId = card.dataset?.sessionId
+    if (!sessionId) return
+    submitFollowUp(card, sessionId, instruction, input)
+  })
+
+  async function submitFollowUp(card, oldSessionId, instruction, input) {
+    // Get the element selector from the card to find context
+    const elementLabel = card.querySelector('.di-agent-element')?.textContent || ''
+    input.value = ''
+    input.disabled = true
+
+    // Hide follow-up, reset card for new session
+    const followup = card.querySelector('.di-agent-followup')
+    if (followup) followup.style.display = 'none'
+    card.classList.remove('done')
+
+    // Add a log entry for the follow-up
+    addLogEntry(card, { type: 'system', icon: '💬', text: `Follow-up: ${instruction}` })
+    updateSessionStatus(card, 'starting')
+
+    // Build a simpler follow-up prompt (no need for full element context again)
+    const followUpPrompt = `Continue editing the same element: ${elementLabel}\n\nThe user wants an additional change: "${instruction}"\n\nApply this change to the same file you just edited. Keep all previous changes intact.`
+
+    // Start a new session
+    const newSessionId = crypto.randomUUID()
+    card.dataset.sessionId = newSessionId
+
+    const isConnected = agenticClient.isConnected() || await agenticClient.connect()
+    if (isConnected) {
+      agenticClient.startSession(newSessionId, followUpPrompt, '', elementLabel)
+    }
+    input.disabled = false
+  }
 
   // Escape key closes agentic mode and prompt
   document.addEventListener('keydown', (e) => {

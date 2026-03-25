@@ -281,12 +281,9 @@ export function createAgenticClient() {
 
       case 'session:progress':
         if (session) {
-          // Parse the Claude stream event
-          const step = parseProgressEvent(msg.event)
-          if (step) {
-            session.steps.push(step)
-            emit({ type: 'session:progress', sessionId: msg.sessionId, step })
-          }
+          // Pass raw event for rich UI rendering
+          session.steps.push(msg.event)
+          emit({ type: 'session:progress', sessionId: msg.sessionId, rawEvent: msg.event })
         }
         break
 
