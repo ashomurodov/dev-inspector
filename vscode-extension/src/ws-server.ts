@@ -9,6 +9,8 @@ interface IncomingMessage {
   elementSelector?: string;
 }
 
+type LogFn = (msg: string) => void;
+
 /**
  * Local WebSocket server that accepts connections from the browser-side
  * dev-inspector. Handles session lifecycle messages and relays progress
@@ -19,10 +21,14 @@ export class WsServer {
   private port: number;
   private sessions: SessionManager;
   private clients = new Set<WebSocket>();
+  private log: LogFn;
+  private getWorkspaceCwd: () => string;
 
-  constructor(port: number, sessions: SessionManager) {
+  constructor(port: number, sessions: SessionManager, log: LogFn, getWorkspaceCwd: () => string) {
     this.port = port;
     this.sessions = sessions;
+    this.log = log;
+    this.getWorkspaceCwd = getWorkspaceCwd;
   }
 
   start(): Promise<number> {
@@ -81,10 +87,13 @@ export class WsServer {
     switch (msg.type) {
       case 'session:start':
         if (msg.sessionId && msg.prompt) {
+          const cwd = msg.cwd || this.getWorkspaceCwd();
+          this.log(`Session ${msg.sessionId.slice(0, 8)}... starting in cwd: ${cwd}`);
+          this.log(`Element: ${msg.elementSelector || '(unknown)'}`);
           this.sessions.startSession(
             msg.sessionId,
             msg.prompt,
-            msg.cwd || process.cwd(),
+            cwd,
             msg.elementSelector || '',
             ws,
           );
