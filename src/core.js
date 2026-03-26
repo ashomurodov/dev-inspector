@@ -1002,8 +1002,8 @@ export function init(options = {}) {
 
       case 'session:progress':
         if (card && event.rawEvent) {
-          const entry = parseEventToLogEntry(event.rawEvent)
-          if (entry) addLogEntry(card, entry)
+          const entries = parseEventToLogEntry(event.rawEvent)
+          if (entries.length > 0) addLogEntry(card, entries)
         }
         break
 
