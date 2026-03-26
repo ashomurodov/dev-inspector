@@ -1071,11 +1071,11 @@ export function injectStyles() {
       word-break: break-word;
     }
     .di-log-tool .di-log-text { color: #c4b5fd; }
-    .di-log-thinking .di-log-text { color: #71717a; font-style: italic; }
+    .di-log-thinking .di-log-text { color: #71717a; font-style: italic; font-size: 10px; }
     .di-log-error .di-log-text { color: #f87171; }
     .di-log-result .di-log-text { color: #4ade80; font-weight: 500; }
     .di-log-system .di-log-text { color: #818cf8; }
-    .di-log-text .di-log-text { color: #e4e4e7; }
+    .di-log-entry.di-log-text .di-log-text { color: #e4e4e7; line-height: 1.4; }
 
     /* ── Follow-up input ── */
     .di-agent-followup {

@@ -109,13 +109,16 @@ const TOOL_ICONS = {
 }
 
 /**
- * Parses a raw stream-json event into a displayable log entry object.
- * Returns null if the event shouldn't be shown.
+ * Parses a raw stream-json event into displayable log entry objects.
+ * Returns an array of entries (can be multiple per event).
+ * Returns empty array if nothing should be shown.
  */
 export function parseEventToLogEntry(event) {
-  if (!event) return null
+  if (!event) return []
 
-  // Tool use events
+  const entries = []
+
+  // Tool use and text events from assistant messages
   if (event.type === 'assistant' && event.message?.content) {
     const content = event.message.content
     for (const block of content) {
@@ -139,69 +142,67 @@ export function parseEventToLogEntry(event) {
           text = `Running: ${input.command.slice(0, 50)}`
         }
 
-        return { type: 'tool', icon, text }
+        entries.push({ type: 'tool', icon, text })
       }
 
       if (block.type === 'text' && block.text) {
         const text = block.text.trim()
-        if (text.length > 0 && text.length < 200) {
-          return { type: 'text', icon: '💬', text: text.slice(0, 120) }
+        if (text.length > 0) {
+          // Show full explanation, truncated to a reasonable length for the card
+          entries.push({ type: 'text', icon: '💬', text: text.slice(0, 300) })
         }
       }
 
-      if (block.type === 'thinking') {
-        return { type: 'thinking', icon: '🧠', text: 'Thinking...' }
+      if (block.type === 'thinking' && block.thinking) {
+        const preview = block.thinking.trim().slice(0, 120)
+        entries.push({ type: 'thinking', icon: '🧠', text: preview || 'Thinking...' })
       }
     }
   }
 
-  // Tool results (file contents, search results, etc.)
+  // Tool results — only show errors
   if (event.type === 'user' && event.message?.content) {
     for (const block of event.message.content) {
       if (block.type === 'tool_result' && block.is_error) {
         const errText = typeof block.content === 'string'
           ? block.content.slice(0, 80)
           : 'Tool error'
-        return { type: 'error', icon: '⚠️', text: errText }
+        entries.push({ type: 'error', icon: '⚠️', text: errText })
       }
     }
   }
 
   // System init
   if (event.type === 'system' && event.subtype === 'init') {
-    return { type: 'system', icon: '⚡', text: 'Claude session started' }
+    entries.push({ type: 'system', icon: '⚡', text: 'Claude session started' })
   }
 
-  // Final result
-  if (event.type === 'result') {
-    const duration = event.duration_ms ? `${(event.duration_ms / 1000).toFixed(1)}s` : ''
-    const turns = event.num_turns ? `${event.num_turns} turns` : ''
-    const parts = [turns, duration].filter(Boolean).join(' · ')
-    return {
-      type: 'result',
-      icon: event.is_error ? '❌' : '✅',
-      text: event.is_error ? 'Failed' : `Done${parts ? ' (' + parts + ')' : ''}`,
-    }
-  }
+  // Skip 'result' events here — session:complete handles the "Done" entry
+  // to avoid duplicates
 
-  return null
+  return entries
 }
 
 /**
- * Adds a log entry to a session card's activity log.
+ * Adds one or more log entries to a session card's activity log.
+ * Accepts a single entry object or an array of entries.
  */
-export function addLogEntry(card, entry) {
-  if (!entry) return
+export function addLogEntry(card, entryOrEntries) {
+  if (!entryOrEntries) return
+  const entries = Array.isArray(entryOrEntries) ? entryOrEntries : [entryOrEntries]
   const log = card.querySelector('.di-agent-activity-log')
   if (!log) return
 
-  const el = document.createElement('div')
-  el.className = `di-agent-log-entry di-log-${entry.type}`
-  el.innerHTML = `
-    <span class="di-log-icon">${entry.icon}</span>
-    <span class="di-log-text">${escHtml(entry.text)}</span>
-  `
-  log.appendChild(el)
+  for (const entry of entries) {
+    if (!entry) continue
+    const el = document.createElement('div')
+    el.className = `di-agent-log-entry di-log-${entry.type}`
+    el.innerHTML = `
+      <span class="di-log-icon">${entry.icon}</span>
+      <span class="di-log-text">${escHtml(entry.text)}</span>
+    `
+    log.appendChild(el)
+  }
 
   // Auto-scroll to bottom
   const activity = card.querySelector('.di-agent-activity')
